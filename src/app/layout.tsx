@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
+import { Providers } from "./providers";
 import { Nav } from "./nav";
 
 export const metadata: Metadata = {
@@ -8,17 +8,15 @@ export const metadata: Metadata = {
   description: "AI-powered code review agent",
 };
 
-const RootLayout = ({ children }: { children: React.ReactNode }) => {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col bg-gray-950 text-gray-100">
-        <SessionProvider>
+        <Providers>
           <Nav />
           <main className="flex-1">{children}</main>
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );
 }
-
-export default RootLayout;
