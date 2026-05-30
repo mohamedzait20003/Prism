@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Review {
+  id        String    @id @default(cuid())
+  prNum     Int
+  repo      String
+  sha       String
+  agentVer  String
+  createdAt DateTime  @default(now())
+  comments  Comment[]
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  reviewId   String
+  review     Review   @relation(fields: [reviewId], references: [id])
+  file       String
+  line       Int
+  message    String
+  severity   String
+  approved   Boolean?
+  humanEdit  String?
+  ruleId     String?
+  createdAt  DateTime @default(now())
+}
+
+model FeedbackEntry {
+  id           String   @id @default(cuid())
+  prNum        Int
+  repo         String
+  file         String
+  line         Int
+  agentComment String
+  humanEdit    String?
+  ruleId       String?
+  createdAt    DateTime @default(now())
+}
