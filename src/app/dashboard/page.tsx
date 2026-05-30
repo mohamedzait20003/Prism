@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Stats, ReviewSummary } from "@/app/models";
+import type { Stats, ReviewSummary } from "@/models";
 
 export const dynamic = "force-dynamic";
 

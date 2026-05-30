@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { AgentEditor } from "./agent-editor";
-import type { AgentData } from "@/app/models";
+import type { AgentData } from "@/models";
 
 export const dynamic = "force-dynamic";
 

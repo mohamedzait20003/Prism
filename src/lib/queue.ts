@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
 import { connection } from "@/config/redis.config";
-import type { ReviewJobPayload } from "@/app/models";
+import type { ReviewJobPayload } from "@/models";
 
 export type { ReviewJobPayload };
 

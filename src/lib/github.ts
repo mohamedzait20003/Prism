@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { Finding } from "@/app/models";
+import type { Finding } from "@/models";
 
 export type { Finding };
 

@@ -1,7 +1,7 @@
 import { resolve, join } from "path";
 import { appendFile } from "fs/promises";
 import simpleGit from "simple-git";
-import type { FeedbackEntry } from "@/app/models";
+import type { FeedbackEntry } from "@/models";
 
 export type { FeedbackEntry };
 

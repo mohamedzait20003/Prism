@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { CommentCard } from "./comment-card";
-import type { ReviewDetail } from "@/app/models";
+import type { ReviewDetail } from "@/models";
 
 export const dynamic = "force-dynamic";
 

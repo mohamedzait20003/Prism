@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FeedbackButtons } from "./feedback-buttons";
-import type { Comment } from "@/app/models";
+import type { Comment } from "@/models";
 
 export function CommentCard({
   comment,
