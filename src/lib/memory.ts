@@ -11,6 +11,7 @@ const isDev = () => process.env.IS_DEVELOPMENT === "true";
 function buildBlock(entry: FeedbackEntry): string {
   const timestamp = new Date().toISOString();
   const correction = entry.humanEdit ?? "Dismissed";
+
   return `
     ## PR #${entry.prNum} — ${timestamp}
 
@@ -26,6 +27,7 @@ async function writeFeedbackLocal(entry: FeedbackEntry): Promise<void> {
   const agentRoot = resolve(process.env.AGENT_REPO_PATH ?? "./agent");
   const feedbackPath = join(agentRoot, "memory", "feedback.md");
   await appendFile(feedbackPath, buildBlock(entry), "utf-8");
+  
   const git = simpleGit(agentRoot);
   await git.add("memory/feedback.md");
   await git.commit(`feedback: rejected comment on PR #${entry.prNum} (${entry.repo})`);
