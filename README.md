@@ -9,11 +9,11 @@ An AI-powered code review agent that reviews GitHub pull requests, posts inline 
 1. A pull request is opened or updated on GitHub
 2. GitHub sends a webhook to `/api/webhook`
 3. A review job is enqueued in Redis via BullMQ
-4. The worker picks up the job, fetches the diff, and runs it through the GitAgent reviewer
+4. The worker fetches the diff and runs it through the GitAgent reviewer
 5. The agent scans for code smells and OWASP Top 10 vulnerabilities in parallel
 6. Findings are posted as inline GitHub review comments and saved to PostgreSQL
-7. Humans approve or reject each comment in the dashboard
-8. Rejections are committed to `agent/memory/feedback.md` via git
+7. Authenticated users approve or reject each comment in the dashboard
+8. Rejections are committed to `agent/memory/feedback.md` — locally via `simple-git` in development, or via the GitHub API in production
 9. When 3+ rejections accumulate for the same rule, the meta-agent proposes rule changes on a new branch
 
 ---
@@ -21,30 +21,33 @@ An AI-powered code review agent that reviews GitHub pull requests, posts inline 
 ## Architecture
 
 ```
-GitHub Webhook
-      │
-      ▼
-POST /api/webhook  ──►  BullMQ Queue (Redis)
-                                │
-                                ▼
-                          Worker Process
-                          ├── fetchDiff (GitHub API)
-                          ├── runReview (GitAgent SDK)
-                          │     ├── code-smell skill
-                          │     ├── security-audit skill
-                          │     └── review-summary skill
-                          ├── postReview (GitHub API)
-                          └── db.review.create (PostgreSQL)
+Browser
+  │  Sign in with GitHub (NextAuth)
+  │  Protected by src/proxy.ts (withAuth)
+  ▼
+Next.js App (Vercel)
+├── / ─────────────────── Landing page
+├── /login ───────────── GitHub OAuth login
+├── /dashboard ───────── Metrics, recent reviews, top rejected rules
+├── /reviews/[id] ────── PR findings + approve/reject UI
+├── /agents/reviewer ─── SOUL.md / RULES.md editor + git log
+└── /api/* ───────────── All data endpoints
 
-Dashboard (/dashboard)
-├── GET /api/stats      ── metrics
-├── GET /api/reviews    ── recent reviews
-└── GET /api/agents/reviewer ── SOUL.md + RULES.md + git log
+GitHub Webhook ─► POST /api/webhook ─► BullMQ Queue (Redis)
+                                              │
+                                         Worker (Render)
+                                         ├── fetchDiff
+                                         ├── runReview (GitAgent SDK)
+                                         │    ├── code-smell skill
+                                         │    ├── security-audit skill
+                                         │    └── review-summary skill
+                                         ├── postReview (GitHub API)
+                                         └── db.review.create (PostgreSQL)
 
 Feedback loop
-├── POST /api/feedback  ── approve / reject comment
-├── writeFeedback()     ── append to agent/memory/feedback.md + git commit
-└── npm run cron        ── meta-agent proposes rule updates
+├── POST /api/feedback ── approve / reject comment (DB transaction)
+├── writeFeedback() ───── commit to feedback.md (git or GitHub API)
+└── npm run cron ──────── meta-agent proposes rule updates
 ```
 
 ---
@@ -56,11 +59,11 @@ Feedback loop
 | Framework | Next.js 16 (App Router, TypeScript) |
 | Styling | Tailwind CSS v4 |
 | Database | PostgreSQL via Prisma 7 + `@prisma/adapter-pg` |
-| Queue | BullMQ + Redis (official `redis` client via `createNodeRedisClient`) |
-| AI agent | `@open-gitagent/gitagent` SDK |
+| Queue | BullMQ + official `redis` client (`createNodeRedisClient`) |
+| AI agent | `@open-gitagent/gitagent` SDK (Anthropic Claude) |
 | GitHub API | Octokit (`@octokit/rest`) |
-| Git operations | `simple-git` |
-| Authentication | NextAuth.js v4 (GitHub OAuth) |
+| Git operations | `simple-git` (dev) / GitHub API (production) |
+| Authentication | NextAuth.js v4 — GitHub OAuth, `withAuth` proxy |
 | Unit tests | Vitest |
 | E2E tests | Playwright (Chromium) |
 
@@ -71,106 +74,122 @@ Feedback loop
 ```
 prism/
 ├── src/
+│   ├── proxy.ts                     Route protection (Next.js 16 withAuth)
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── agents/[id]/     GET agent files, POST save
-│   │   │   ├── feedback/        POST approve/reject comment
-│   │   │   ├── reviews/         GET list, GET [id]
-│   │   │   ├── run/             POST manual trigger
-│   │   │   ├── stats/           GET dashboard metrics
-│   │   │   └── webhook/         POST GitHub webhook receiver
-│   │   ├── agents/[id]/         Agent editor UI
-│   │   ├── dashboard/           Metrics + review list
-│   │   └── reviews/[prId]/      PR review viewer
+│   │   ├── page.tsx                 Landing page
+│   │   ├── login/                   GitHub OAuth sign-in page
+│   │   ├── nav.tsx                  Sticky nav — user avatar, sign-out
+│   │   ├── layout.tsx               Root layout with SessionProvider
+│   │   ├── dashboard/               Metrics cards, reviews table, rejected rules
+│   │   ├── reviews/[prId]/          PR findings + approve/reject flow
+│   │   ├── agents/[id]/             SOUL.md + RULES.md editor, git history
+│   │   └── api/
+│   │       ├── auth/[...nextauth]/  NextAuth handler (GitHub OAuth)
+│   │       ├── agents/[id]/         GET files + commits, POST save
+│   │       ├── feedback/            POST approve/reject (DB transaction)
+│   │       ├── reviews/             GET list, GET [id]
+│   │       ├── run/                 POST manual trigger
+│   │       ├── stats/               GET dashboard metrics
+│   │       └── webhook/             POST GitHub webhook (HMAC verified)
 │   ├── config/
-│   │   ├── prisma.config.ts     Prisma 7 datasource config
-│   │   └── redis.config.ts      Official redis client + BullMQ connection
+│   │   ├── prisma.config.ts         Prisma 7 datasource + schema path
+│   │   └── redis.config.ts          Official redis client + BullMQ connection
 │   ├── cron/
-│   │   └── meta-agent.ts        Self-improvement cron script
+│   │   └── meta-agent.ts            Self-improvement script (npm run cron)
 │   ├── lib/
-│   │   ├── crypto.ts            HMAC signature verification
-│   │   ├── db.ts                Prisma client singleton
-│   │   ├── gitagent.ts          GitAgent SDK wrapper
-│   │   ├── github.ts            Octokit + diff fetcher + review poster
-│   │   ├── memory.ts            Feedback writer (git commit)
-│   │   ├── queue.ts             BullMQ queue definition
-│   │   └── worker.ts            BullMQ worker process
+│   │   ├── crypto.ts                HMAC signature verification
+│   │   ├── db.ts                    Prisma client singleton (pg adapter)
+│   │   ├── gitagent.ts              GitAgent SDK wrapper (dynamic ESM import)
+│   │   ├── github.ts                Octokit — fetchDiff, postReview, parseRepo
+│   │   ├── memory.ts                Feedback writer — local git or GitHub API
+│   │   ├── queue.ts                 BullMQ Queue definition
+│   │   └── worker.ts                BullMQ Worker — full review pipeline
 │   └── models/
-│       ├── agent.ts             Finding, AgentData
-│       ├── queue.ts             ReviewJobPayload, FeedbackEntry
-│       ├── review.ts            Comment, ReviewSummary, ReviewDetail
-│       └── stats.ts             Stats
-├── agent/                       GitAgent definition (own git history)
-│   ├── agent.yaml               Manifest: model, skills, compliance
-│   ├── SOUL.md                  Agent identity and tone
-│   ├── RULES.md                 Must-flag / must-never-flag rules
-│   ├── DUTIES.md                Role permissions
-│   ├── AGENTS.md                Output format instructions
-│   ├── memory/feedback.md       Append-only rejection log
-│   ├── knowledge/               OWASP Top 10 + antipatterns reference
-│   ├── skills/                  code-smell, security-audit, review-summary
-│   ├── workflows/review-flow.yaml  Parallel skill execution
-│   └── agents/meta-agent/       Sub-agent for rule improvement
-├── prisma/schema.prisma         Review, Comment, FeedbackEntry models
-└── tests/
-    ├── unit/                    Vitest — crypto, github, memory, detect
-    └── e2e/                     Playwright — navigation, dashboard, agents
+│       ├── agent.ts                 Finding, AgentData
+│       ├── queue.ts                 ReviewJobPayload, FeedbackEntry
+│       ├── review.ts                Comment, ReviewSummary, ReviewDetail
+│       ├── stats.ts                 Stats
+│       └── index.ts                 Re-exports all models
+├── agent/                           GitAgent definition
+│   ├── agent.yaml                   Manifest: model, skills, compliance
+│   ├── SOUL.md                      Identity and tone
+│   ├── RULES.md                     Must-flag / must-never-flag rules
+│   ├── DUTIES.md                    Role permissions
+│   ├── AGENTS.md                    Output format instructions
+│   ├── memory/feedback.md           Append-only rejection log
+│   ├── knowledge/                   OWASP Top 10 + antipatterns
+│   ├── skills/                      code-smell, security-audit, review-summary
+│   ├── workflows/review-flow.yaml   Parallel skill execution
+│   └── agents/meta-agent/           Sub-agent for rule proposals
+├── prisma/schema.prisma             Review, Comment, FeedbackEntry models
+├── tests/
+│   ├── unit/                        Vitest — crypto, github, memory, detect
+│   └── e2e/                         Playwright — landing, login, nav, dashboard, agents
+├── .env.example                     All required variables with descriptions
+├── render.yaml                      Render deployment config (app + worker)
+└── .github/workflows/
+    ├── agent-ci.yml                 Validates agent YAML on every push
+    └── deploy.yml                   Tests → DB migration → Vercel → Render
 ```
 
 ---
 
 ## Environment variables
 
-Create `.env.local` at the project root:
+Copy `.env.example` to `.env.local` and fill in each value:
 
 ```env
-# PostgreSQL (Prisma Postgres or any pg-compatible URL)
+# Database
 DATABASE_URL=postgresql://user:password@host:5432/prism
 
-# GitHub
+# GitHub — webhook integration
 GITHUB_TOKEN=ghp_...
 GITHUB_WEBHOOK_SECRET=your-webhook-secret
 
-# Anthropic (read by GitAgent SDK automatically)
+# GitHub — OAuth app (for dashboard login)
+GITHUB_CLIENT_ID=your-oauth-app-client-id
+GITHUB_CLIENT_SECRET=your-oauth-app-client-secret
+
+# NextAuth session
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=                         # openssl rand -base64 32
+
+# Anthropic — read automatically by the GitAgent SDK
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Redis
 REDIS_HOST=your-redis-host
-REDIS_PORT=11281
+REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=your-redis-password
 
-# Agent
+# Agent files
 AGENT_REPO_PATH=./agent
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# NextAuth — GitHub OAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=                      # openssl rand -base64 32
-GITHUB_CLIENT_ID=                     # from github.com/settings/developers
-GITHUB_CLIENT_SECRET=
-
-# IS_DEVELOPMENT=true for local fs+git, false for GitHub API (production)
+# true  → local filesystem + simple-git  (development)
+# false → GitHub API via Octokit          (production / Vercel / Render)
 IS_DEVELOPMENT=true
-GITHUB_REPO=owner/prism               # required when IS_DEVELOPMENT=false
+GITHUB_REPO=owner/prism                  # required when IS_DEVELOPMENT=false
 ```
 
 ---
 
 ## Authentication setup
 
-PRism uses GitHub OAuth via NextAuth. To create the OAuth App:
+PRism uses GitHub OAuth. Create an OAuth App:
 
-1. Go to **github.com → Settings → Developer settings → OAuth Apps → New OAuth App**
-2. Fill in:
-   - **Application name:** PRism
-   - **Homepage URL:** `http://localhost:3000` (or your production URL)
+1. **github.com → Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Set the fields:
+   - **Homepage URL:** `http://localhost:3000`
    - **Authorization callback URL:** `http://localhost:3000/api/auth/callback/github`
 3. Copy **Client ID** → `GITHUB_CLIENT_ID`
 4. Generate a **Client Secret** → `GITHUB_CLIENT_SECRET`
 5. Generate a session secret: `openssl rand -base64 32` → `NEXTAUTH_SECRET`
 
-For production, update the callback URL to your deployed domain.
+For production, update both URLs to your deployed domain before creating the app.
+
+Routes protected by `src/proxy.ts`: `/dashboard`, `/reviews/*`, `/agents/*`
 
 ---
 
@@ -188,115 +207,130 @@ For production, update the callback URL to your deployed domain.
 npm install
 ```
 
-### 2. Set up the database
+### 2. Configure environment
+
+```bash
+cp .env.example .env.local
+# Fill in all values
+```
+
+### 3. Push the database schema
 
 ```bash
 npm run db:push
 ```
 
-### 3. Start the dev server
+### 4. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-### 4. Start the worker (separate terminal)
+### 5. Start the worker (separate terminal)
 
 ```bash
 npm run worker
 ```
 
-### 5. Expose the webhook endpoint
+### 6. Expose the webhook endpoint
 
 ```bash
 npx ngrok http 3000
 ```
 
-Register the ngrok URL + `/api/webhook` as a GitHub webhook on your repository. Select the **Pull requests** event.
+Register the ngrok URL + `/api/webhook` as a GitHub webhook. Select the **Pull requests** event only.
 
 ---
 
 ## Running tests
 
 ```bash
-# Unit tests (Vitest)
+# Unit tests (Vitest) — 16 tests, no server required
 npm test
 
-# Unit tests in watch mode
+# Watch mode
 npm run test:watch
 
 # Coverage report
 npm run test:coverage
 
-# E2E tests (Playwright, requires dev server running)
+# E2E tests (Playwright — requires npm run dev to be running)
 npm run test:e2e
 
-# E2E with interactive UI
+# Interactive E2E UI
 npm run test:e2e:ui
 ```
+
+**Unit tests cover:** HMAC signature verification, `parseRepo`, `writeFeedback` (mocked), `extractAddedLines` diff parser
+
+**E2E tests cover:** Landing page, login page, auth redirect, dashboard (API mocked), agent editor (API mocked)
 
 ---
 
 ## API reference
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/webhook` | GitHub webhook receiver — validates HMAC, enqueues review job |
-| `POST` | `/api/run` | Manual trigger — `{ repo, prNum }` |
-| `POST` | `/api/feedback` | Approve/reject a comment — `{ commentId, approved, humanEdit? }` |
-| `GET` | `/api/stats` | Dashboard metrics |
-| `GET` | `/api/reviews` | Recent reviews list |
-| `GET` | `/api/reviews/[id]` | Single review with all comments |
-| `GET` | `/api/agents/[id]` | Agent SOUL.md, RULES.md, and commit history |
-| `POST` | `/api/agents/[id]/save` | Save edited SOUL.md and RULES.md — `{ soul, rules }` |
+All data routes require an authenticated session.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/webhook` | HMAC only | GitHub webhook — enqueues review job |
+| `POST` | `/api/run` | Session | Manual trigger — `{ repo, prNum }` |
+| `POST` | `/api/feedback` | Session | Approve/reject comment — `{ commentId, approved, humanEdit? }` |
+| `GET` | `/api/stats` | Session | Dashboard metrics |
+| `GET` | `/api/reviews` | Session | Recent reviews list |
+| `GET` | `/api/reviews/[id]` | Session | Single review with comments |
+| `GET` | `/api/agents/[id]` | Session | SOUL.md, RULES.md, commit history |
+| `POST` | `/api/agents/[id]/save` | Session | Write SOUL.md and RULES.md — `{ soul, rules }` |
 
 ---
 
 ## Agent self-improvement
 
-The meta-agent reads the accumulated rejection log and proposes rule changes when a pattern emerges:
-
 ```bash
 npm run cron
 ```
 
-- Exits early if fewer than 3 feedback entries exist
-- Groups rejections by `ruleId`
-- Calls the meta-agent with the full feedback log + current rules
-- Commits proposed diffs to a new branch: `meta-agent/update-{timestamp}`
-- A human must review and merge the branch — the agent cannot self-approve
+- Reads `agent/memory/feedback.md`
+- Exits if fewer than 3 rejection entries
+- Groups rejections by `ruleId`, calls the meta-agent
+- Commits proposed rule diffs to a new branch: `meta-agent/update-{timestamp}`
+- A human must open and merge the PR — the agent cannot self-approve
 
 ---
 
 ## Deployment
 
-### Railway (recommended — everything on one platform)
+### Recommended free stack
 
-1. Create a new Railway project
-2. Add your GitHub repo as a service (Next.js app, start: `npm start`)
-3. Add a second service from the same repo (worker, start: `npm run worker`)
-4. Add Redis and PostgreSQL plugins from the Railway dashboard
-5. Set all environment variables on both services
+| Component | Platform | Notes |
+|---|---|---|
+| Next.js app | **Vercel** | Auto-deploy on push, always-on |
+| Worker | **Render** (Background Worker) | Free tier — sleeps after 15 min idle; jobs are held in Redis and processed on wake |
+| Redis | **Upstash** or any managed Redis | Free tier available |
+| PostgreSQL | **Prisma Postgres** | Already configured in `.env.local` |
 
-### Split stack (free tier)
+Set `IS_DEVELOPMENT=false` and `GITHUB_REPO=owner/prism` on both Vercel and Render.
 
-| Component | Platform |
+### CI/CD pipeline (GitHub Actions)
+
+On every push to `main`:
+
+| Job | What it does |
 |---|---|
-| Next.js app | Vercel |
-| Worker | Render (background worker) |
-| Redis | Upstash (free 10k commands/day) |
-| PostgreSQL | Prisma Postgres (already configured) |
+| `test` | Runs all Vitest unit tests |
+| `migrate` | Runs `prisma db push` against the production DB |
+| `deploy-frontend` | Builds and deploys to Vercel via CLI |
+| `deploy-worker` | Triggers the Render background worker deploy hook |
 
-> **Note:** The agent file writes (`save` endpoint, `writeFeedback`) use the local filesystem and `simple-git`. On Vercel/Render these will need to be migrated to Vercel Blob + GitHub API commits for full compatibility.
+**Required GitHub Actions secrets:** `DATABASE_URL`, `VERCEL_TOKEN`, `RENDER_DEPLOY_HOOK_URL`
+
+Disable auto-deploy on both Vercel and Render so only the Actions pipeline triggers deployments.
 
 ---
 
-## CI
+## CI — Agent validation
 
-GitHub Actions runs on every push and pull request:
+`.github/workflows/agent-ci.yml` runs on every push and pull request:
 
-- Validates `agent/agent.yaml` parses correctly
-- Validates `agent/agents/meta-agent/agent.yaml` parses correctly
-- Checks all required agent files are present
-
-See `.github/workflows/agent-ci.yml`.
+- Checks all required `agent/` files are present
+- Validates `agent/agent.yaml` and `agent/agents/meta-agent/agent.yaml` parse as valid YAML
