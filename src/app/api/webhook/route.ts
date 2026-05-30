@@ -1,29 +1,15 @@
-import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-
 import { reviewQueue } from "@/lib/queue";
+import { verifyHmacSignature } from "@/lib/crypto";
 
 const IGNORED_ACTIONS = new Set(["closed", "merged", "labeled", "unlabeled", "assigned"]);
-
-function verifySignature(body: string, signature: string | null): boolean {
-  if (!signature) 
-    return false;
-  
-  const secret = process.env.GITHUB_WEBHOOK_SECRET ?? "";
-  const expected = "sha256=" + createHmac("sha256", secret).update(body).digest("hex");
-  
-  try {
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
+  const secret = process.env.GITHUB_WEBHOOK_SECRET ?? "";
 
-  if (!verifySignature(body, signature)) {
+  if (!verifyHmacSignature(body, signature, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
