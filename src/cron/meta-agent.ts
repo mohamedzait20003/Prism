@@ -23,7 +23,9 @@ async function main() {
   const entryCount = countFeedbackEntries(feedbackMd);
 
   if (entryCount < 3) {
-    console.log(`[meta-agent] Only ${entryCount} feedback entries — need at least 3. Exiting.`);
+    console.log(
+      `[meta-agent] Only ${entryCount} feedback entries — need at least 3. Exiting.`,
+    );
     return;
   }
 
@@ -52,10 +54,16 @@ ${rulesMd}
 --- SOUL.md ---
 ${soulMd}`;
 
-  console.log(`[meta-agent] Running meta-agent on ${entryCount} feedback entries...`);
+  console.log(
+    `[meta-agent] Running meta-agent on ${entryCount} feedback entries...`,
+  );
   const raw = await runMetaAgentQuery(META_AGENT_DIR, prompt);
 
-  let result: { reasoning: string; rules_diff: string | null; soul_diff: string | null };
+  let result: {
+    reasoning: string;
+    rules_diff: string | null;
+    soul_diff: string | null;
+  };
   try {
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON object found in response");
@@ -81,8 +89,9 @@ ${soulMd}`;
     const existing = await readAgentFile("RULES.md");
     await writeFile(
       join(AGENT_REPO_PATH, "RULES.md"),
-      existing + `\n\n<!-- meta-agent proposed diff ${new Date().toISOString()} -->\n${result.rules_diff}\n`,
-      "utf-8"
+      existing +
+        `\n\n<!-- meta-agent proposed diff ${new Date().toISOString()} -->\n${result.rules_diff}\n`,
+      "utf-8",
     );
     await git.add("RULES.md");
   }
@@ -91,19 +100,24 @@ ${soulMd}`;
     const existing = await readAgentFile("SOUL.md");
     await writeFile(
       join(AGENT_REPO_PATH, "SOUL.md"),
-      existing + `\n\n<!-- meta-agent proposed diff ${new Date().toISOString()} -->\n${result.soul_diff}\n`,
-      "utf-8"
+      existing +
+        `\n\n<!-- meta-agent proposed diff ${new Date().toISOString()} -->\n${result.soul_diff}\n`,
+      "utf-8",
     );
     await git.add("SOUL.md");
   }
 
-  await git.commit(`meta-agent: propose rule updates (${new Date().toISOString()})`);
+  await git.commit(
+    `meta-agent: propose rule updates (${new Date().toISOString()})`,
+  );
 
   try {
     await git.push("origin", branch);
     console.log(`[meta-agent] Branch pushed: ${branch}`);
   } catch {
-    console.log(`[meta-agent] Branch committed locally: ${branch} (push failed — open PR manually)`);
+    console.log(
+      `[meta-agent] Branch committed locally: ${branch} (push failed — open PR manually)`,
+    );
   }
 
   console.log("[meta-agent] Reasoning:", result.reasoning);
