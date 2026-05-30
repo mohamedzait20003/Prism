@@ -9,10 +9,28 @@ export async function POST(req: NextRequest) {
     humanEdit?: string;
   };
 
-  const comment = await db.comment.update({
-    where: { id: commentId },
-    data: { approved, humanEdit: humanEdit ?? null },
-    include: { review: true },
+  const comment = await db.$transaction(async (tx) => {
+    const updated = await tx.comment.update({
+      where: { id: commentId },
+      data: { approved, humanEdit: humanEdit ?? null },
+      include: { review: true },
+    });
+
+    if (!approved) {
+      await tx.feedbackEntry.create({
+        data: {
+          prNum: updated.review.prNum,
+          repo: updated.review.repo,
+          file: updated.file,
+          line: updated.line,
+          agentComment: updated.message,
+          humanEdit: humanEdit ?? null,
+          ruleId: updated.ruleId,
+        },
+      });
+    }
+
+    return updated;
   });
 
   if (!approved) {
@@ -24,18 +42,6 @@ export async function POST(req: NextRequest) {
       ruleId: comment.ruleId ?? "unknown",
       agentComment: comment.message,
       humanEdit: humanEdit ?? null,
-    });
-
-    await db.feedbackEntry.create({
-      data: {
-        prNum: comment.review.prNum,
-        repo: comment.review.repo,
-        file: comment.file,
-        line: comment.line,
-        agentComment: comment.message,
-        humanEdit: humanEdit ?? null,
-        ruleId: comment.ruleId,
-      },
     });
   }
 

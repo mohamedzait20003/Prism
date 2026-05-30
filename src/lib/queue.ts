@@ -1,13 +1,8 @@
 import { Queue } from "bullmq";
 import { connection } from "@/config/redis.config";
+import type { ReviewJobPayload } from "@/app/models";
 
-export interface ReviewJobPayload {
-  repo: string;
-  prNum: number;
-  sha: string;
-  diffUrl: string;
-  agentRepo: string;
-}
+export type { ReviewJobPayload };
 
 export const reviewQueue = new Queue<ReviewJobPayload>("review-pr", {
   connection,

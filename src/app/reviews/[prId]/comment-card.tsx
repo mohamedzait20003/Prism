@@ -2,17 +2,7 @@
 
 import { useState } from "react";
 import { FeedbackButtons } from "./feedback-buttons";
-
-interface Comment {
-  id: string;
-  file: string;
-  line: number;
-  message: string;
-  severity: string;
-  approved: boolean | null;
-  humanEdit: string | null;
-  ruleId: string | null;
-}
+import type { Comment } from "@/app/models";
 
 export function CommentCard({
   comment,

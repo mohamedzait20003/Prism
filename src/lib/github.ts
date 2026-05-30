@@ -1,12 +1,7 @@
 import { Octokit } from "@octokit/rest";
+import type { Finding } from "@/app/models";
 
-export interface Finding {
-  file: string;
-  line: number;
-  message: string;
-  severity: "error" | "warning" | "info";
-  ruleId: string;
-}
+export type { Finding };
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 

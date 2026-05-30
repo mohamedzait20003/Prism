@@ -1,5 +1,5 @@
 import { resolve } from "path";
-import type { Finding } from "./github";
+import type { Finding } from "@/app/models";
 
 const MODEL = "anthropic:claude-sonnet-4-6";
 

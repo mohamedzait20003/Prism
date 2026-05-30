@@ -36,22 +36,24 @@ const worker = new Worker<ReviewJobPayload>(
 
     await postReview(owner, repoName, prNum, sha, findings);
 
-    await db.review.create({
-      data: {
-        prNum,
-        repo,
-        sha,
-        agentVer,
-        comments: {
-          create: findings.map((f) => ({
-            file: f.file,
-            line: f.line,
-            message: f.message,
-            severity: f.severity,
-            ruleId: f.ruleId,
-          })),
+    await db.$transaction(async (tx) => {
+      await tx.review.create({
+        data: {
+          prNum,
+          repo,
+          sha,
+          agentVer,
+          comments: {
+            create: findings.map((f) => ({
+              file: f.file,
+              line: f.line,
+              message: f.message,
+              severity: f.severity,
+              ruleId: f.ruleId,
+            })),
+          },
         },
-      },
+      });
     });
   },
   { connection, concurrency: 3 }

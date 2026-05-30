@@ -1,16 +1,9 @@
 import { resolve, join } from "path";
 import { appendFile } from "fs/promises";
 import simpleGit from "simple-git";
+import type { FeedbackEntry } from "@/app/models";
 
-export interface FeedbackEntry {
-  prNum: number;
-  repo: string;
-  file: string;
-  line: number;
-  ruleId: string;
-  agentComment: string;
-  humanEdit: string | null;
-}
+export type { FeedbackEntry };
 
 export async function writeFeedback(entry: FeedbackEntry): Promise<void> {
   const agentRoot = resolve(process.env.AGENT_REPO_PATH ?? "./agent");

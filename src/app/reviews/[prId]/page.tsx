@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
-import { db } from "@/lib/db";
 import { CommentCard } from "./comment-card";
+import type { ReviewDetail } from "@/app/models";
 
 export const dynamic = "force-dynamic";
+
+const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 const severityBadge: Record<string, string> = {
   error: "bg-red-900 text-red-300 border-red-800",
@@ -13,12 +15,10 @@ const severityBadge: Record<string, string> = {
 export default async function ReviewPage({ params }: { params: Promise<{ prId: string }> }) {
   const { prId } = await params;
 
-  const review = await db.review.findUnique({
-    where: { id: prId },
-    include: { comments: { orderBy: { createdAt: "asc" } } },
-  });
+  const res = await fetch(`${BASE}/api/reviews/${prId}`, { cache: "no-store" });
+  if (!res.ok) notFound();
 
-  if (!review) notFound();
+  const review: ReviewDetail = await res.json();
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-6">
@@ -27,7 +27,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ prId: s
           PR <span className="text-indigo-400">#{review.prNum}</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          {review.repo} · {review.sha.slice(0, 7)} · agent v{review.agentVer} · {review.createdAt.toLocaleString()}
+          {review.repo} · {review.sha.slice(0, 7)} · agent v{review.agentVer} · {new Date(review.createdAt).toLocaleString()}
         </p>
       </div>
 
