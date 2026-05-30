@@ -38,7 +38,6 @@ export function extractAddedLines(diff: string): DiffLine[] {
         content: line.slice(1),
       });
     } else if (!line.startsWith("-")) {
-      // Context line
       currentLine++;
     }
   }
