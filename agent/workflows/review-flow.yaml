@@ -1,0 +1,36 @@
+name: review-flow
+description: Full PR review — run code-smell and security-audit in parallel, then merge with review-summary.
+
+steps:
+  - skill: code-smell
+    prompt: |
+      Scan this diff for code smells using the rules below.
+
+      Diff:
+      ${{ trigger.diff }}
+
+      Rules:
+      ${{ agent.RULES }}
+
+  - skill: security-audit
+    prompt: |
+      Scan this diff for OWASP Top 10 security vulnerabilities using the knowledge below.
+
+      Diff:
+      ${{ trigger.diff }}
+
+      OWASP Knowledge:
+      ${{ agent.knowledge.owasp-top10 }}
+
+  - skill: review-summary
+    prompt: |
+      Merge the findings below and rewrite messages to match the agent soul.
+
+      Code smell findings:
+      ${{ steps.code-smell.output }}
+
+      Security findings:
+      ${{ steps.security-audit.output }}
+
+      Soul reference:
+      ${{ agent.SOUL }}

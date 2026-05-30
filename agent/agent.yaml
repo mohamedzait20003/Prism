@@ -1,0 +1,29 @@
+spec_version: "0.1.0"
+name: pr-pilot-reviewer
+version: "0.1.0"
+description: AI-powered pull request reviewer that posts inline code comments.
+model: anthropic:claude-sonnet-4-6
+
+skills:
+  - code-smell
+  - security-audit
+  - review-summary
+
+compliance:
+  risk_level: medium
+  segregation_of_duties:
+    roles:
+      reviewer:
+        permissions:
+          - create_comment
+          - read_diff
+      meta:
+        permissions:
+          - propose_rules
+          - read_memory
+    conflicts:
+      - [reviewer, meta]
+    assignments:
+      pr-pilot-reviewer: reviewer
+      meta-agent: meta
+    enforcement: strict

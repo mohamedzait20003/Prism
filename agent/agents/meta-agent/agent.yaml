@@ -1,0 +1,5 @@
+spec_version: "0.1.0"
+name: meta-agent
+version: "0.1.0"
+description: Reads accumulated feedback and proposes minimal improvements to RULES.md and SOUL.md.
+model: anthropic:claude-sonnet-4-6
