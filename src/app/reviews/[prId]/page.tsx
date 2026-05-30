@@ -12,11 +12,12 @@ const severityBadge: Record<string, string> = {
   info: "bg-blue-900 text-blue-300 border-blue-800",
 };
 
-export default async function ReviewPage({ params }: { params: Promise<{ prId: string }> }) {
+const ReviewPage = async ({ params }: { params: Promise<{ prId: string }> }) => {
   const { prId } = await params;
-
   const res = await fetch(`${BASE}/api/reviews/${prId}`, { cache: "no-store" });
-  if (!res.ok) notFound();
+  
+  if (!res.ok) 
+    notFound();
 
   const review: ReviewDetail = await res.json();
 
@@ -47,3 +48,5 @@ export default async function ReviewPage({ params }: { params: Promise<{ prId: s
     </div>
   );
 }
+
+export default ReviewPage;

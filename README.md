@@ -60,6 +60,7 @@ Feedback loop
 | AI agent | `@open-gitagent/gitagent` SDK |
 | GitHub API | Octokit (`@octokit/rest`) |
 | Git operations | `simple-git` |
+| Authentication | NextAuth.js v4 (GitHub OAuth) |
 | Unit tests | Vitest |
 | E2E tests | Playwright (Chromium) |
 
@@ -142,7 +143,34 @@ REDIS_PASSWORD=your-redis-password
 # Agent
 AGENT_REPO_PATH=./agent
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# NextAuth — GitHub OAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=                      # openssl rand -base64 32
+GITHUB_CLIENT_ID=                     # from github.com/settings/developers
+GITHUB_CLIENT_SECRET=
+
+# IS_DEVELOPMENT=true for local fs+git, false for GitHub API (production)
+IS_DEVELOPMENT=true
+GITHUB_REPO=owner/prism               # required when IS_DEVELOPMENT=false
 ```
+
+---
+
+## Authentication setup
+
+PRism uses GitHub OAuth via NextAuth. To create the OAuth App:
+
+1. Go to **github.com → Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Fill in:
+   - **Application name:** PRism
+   - **Homepage URL:** `http://localhost:3000` (or your production URL)
+   - **Authorization callback URL:** `http://localhost:3000/api/auth/callback/github`
+3. Copy **Client ID** → `GITHUB_CLIENT_ID`
+4. Generate a **Client Secret** → `GITHUB_CLIENT_SECRET`
+5. Generate a session secret: `openssl rand -base64 32` → `NEXTAUTH_SECRET`
+
+For production, update the callback URL to your deployed domain.
 
 ---
 

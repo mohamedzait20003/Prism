@@ -6,21 +6,20 @@ import type { FeedbackEntry } from "@/models";
 
 export type { FeedbackEntry };
 
-const isDev = process.env.IS_DEVELOPMENT === "true";
+const isDev = () => process.env.IS_DEVELOPMENT === "true";
 
 function buildBlock(entry: FeedbackEntry): string {
   const timestamp = new Date().toISOString();
   const correction = entry.humanEdit ?? "Dismissed";
   return `
-## PR #${entry.prNum} — ${timestamp}
+    ## PR #${entry.prNum} — ${timestamp}
 
-- **Repo:** ${entry.repo}
-- **File:** ${entry.file}:${entry.line}
-- **Rule:** ${entry.ruleId}
-- **Agent said:** ${entry.agentComment}
-- **Human correction:** ${correction}
-
-`;
+    - **Repo:** ${entry.repo}
+    - **File:** ${entry.file}:${entry.line}
+    - **Rule:** ${entry.ruleId}
+    - **Agent said:** ${entry.agentComment}
+    - **Human correction:** ${correction}
+  `;
 }
 
 async function writeFeedbackLocal(entry: FeedbackEntry): Promise<void> {
@@ -52,7 +51,7 @@ async function writeFeedbackGitHub(entry: FeedbackEntry): Promise<void> {
 }
 
 export async function writeFeedback(entry: FeedbackEntry): Promise<void> {
-  if (isDev) {
+  if (isDev()) {
     await writeFeedbackLocal(entry);
   } else {
     await writeFeedbackGitHub(entry);

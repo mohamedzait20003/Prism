@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-export default async function AgentPage({ params }: { params: Promise<{ id: string }> }) {
+const AgentPage = async ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
 
   const res = await fetch(`${BASE}/api/agents/${id}`, { cache: "no-store" });
@@ -41,3 +41,5 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
     </div>
   );
 }
+
+export default AgentPage;

@@ -17,6 +17,7 @@ import { appendFile } from "fs/promises";
 describe("writeFeedback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.IS_DEVELOPMENT = "true";
     process.env.AGENT_REPO_PATH = "/tmp/agent";
   });
 
