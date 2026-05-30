@@ -8,6 +8,7 @@
     "start": "next start",
     "worker": "tsx src/lib/worker.ts",
     "cron": "tsx src/cron/meta-agent.ts",
+    "postinstall": "prisma generate --config src/config/prisma.config.ts",
     "db:generate": "prisma generate --config src/config/prisma.config.ts",
     "db:push": "prisma db push --config src/config/prisma.config.ts && npm run db:generate",
     "db:studio": "prisma studio --config src/config/prisma.config.ts",
