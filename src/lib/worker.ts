@@ -9,6 +9,7 @@ config({ path: resolve(process.cwd(), ".env.local") });
 import { db } from "./db";
 import { runReview } from "./gitagent";
 import type { ReviewJobPayload } from "./queue";
+import { connection } from "../config/redis.config";
 import { fetchDiff, postReview, parseRepo } from "./github";
 
 const AGENT_REPO_PATH = resolve(process.env.AGENT_REPO_PATH ?? "./agent");
@@ -21,17 +22,6 @@ function getAgentVersion(): string {
   } catch {
     return "0.1.0";
   }
-}
-
-function redisConnection() {
-  return {
-    host: process.env.REDIS_HOST ?? "localhost",
-    port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-    username: process.env.REDIS_USERNAME ?? "default",
-    password: process.env.REDIS_PASSWORD,
-    maxRetriesPerRequest: null as null,
-    tls: process.env.REDIS_HOST ? {} : undefined,
-  };
 }
 
 const worker = new Worker<ReviewJobPayload>(
@@ -64,7 +54,7 @@ const worker = new Worker<ReviewJobPayload>(
       },
     });
   },
-  { connection: redisConnection(), concurrency: 3 }
+  { connection, concurrency: 3 }
 );
 
 worker.on("completed", (job) => {
