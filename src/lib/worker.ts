@@ -24,12 +24,13 @@ function getAgentVersion(): string {
 }
 
 function redisConnection() {
-  const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
   return {
-    host: url.hostname,
-    port: parseInt(url.port || "6379", 10),
-    password: url.password || undefined,
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+    username: process.env.REDIS_USERNAME ?? "default",
+    password: process.env.REDIS_PASSWORD,
     maxRetriesPerRequest: null as null,
+    tls: process.env.REDIS_HOST ? {} : undefined,
   };
 }
 
