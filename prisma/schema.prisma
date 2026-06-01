@@ -6,38 +6,113 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum ProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AgentConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  content   String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model ProposedRuleUpdate {
+  id            String         @id @default(cuid())
+  proposedSoul  String?
+  proposedRules String?
+  reasoning     String
+  status        ProposalStatus @default(PENDING)
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime       @default(now())
+}
+
+// Normalised base — every user (client or admin)
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  username      String?        @unique
+  passwordHash  String?
+  name          String?
+  image         String?
+  role          Role           @default(CLIENT)
+  createdAt     DateTime       @default(now())
+  clientProfile ClientProfile?
+}
+
+// Client-specific extension — created when a client connects GitHub
+model ClientProfile {
+  id          String          @id @default(cuid())
+  userId      String          @unique
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubId    String          @unique
+  githubLogin String          @unique
+  githubToken String
+  repos       ConnectedRepo[]
+  feedback    FeedbackEntry[] // all feedback given by this client
+}
+
+model ConnectedRepo {
+  id              String          @id @default(cuid())
+  profileId       String
+  profile         ClientProfile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  fullName        String
+  githubWebhookId Int?
+  webhookIdHash   String          @unique
+  webhookSecret   String
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  reviews         Review[]
+  feedback        FeedbackEntry[]
+
+  @@unique([profileId, fullName])
+}
+
 model Review {
-  id        String    @id @default(cuid())
+  id        String         @id @default(cuid())
   prNum     Int
-  repo      String
   sha       String
   agentVer  String
-  createdAt DateTime  @default(now())
+  repoId    String?
+  repo      ConnectedRepo? @relation(fields: [repoId], references: [id])
+  createdAt DateTime       @default(now())
   comments  Comment[]
 }
 
 model Comment {
-  id         String   @id @default(cuid())
-  reviewId   String
-  review     Review   @relation(fields: [reviewId], references: [id])
-  file       String
-  line       Int
-  message    String
-  severity   String
-  approved   Boolean?
-  humanEdit  String?
-  ruleId     String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  reviewId  String
+  review    Review   @relation(fields: [reviewId], references: [id])
+  file      String
+  line      Int
+  message   String
+  severity  String
+  approved  Boolean?
+  humanEdit String?
+  ruleId    String?
+  createdAt DateTime @default(now())
 }
 
 model FeedbackEntry {
-  id           String   @id @default(cuid())
-  prNum        Int
-  repo         String
-  file         String
-  line         Int
-  agentComment String
-  humanEdit    String?
-  ruleId       String?
-  createdAt    DateTime @default(now())
+  id            String         @id @default(cuid())
+  prNum         Int
+  file          String
+  line          Int
+  agentComment  String
+  humanEdit     String?
+  ruleId        String?
+  profileId     String?
+  profile       ClientProfile? @relation(fields: [profileId], references: [id])
+  repoId        String?
+  connectedRepo ConnectedRepo? @relation(fields: [repoId], references: [id])
+  createdAt     DateTime       @default(now())
 }

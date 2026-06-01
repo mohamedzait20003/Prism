@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractAddedLines } from "../../../agent/skills/code-smell/detect";
+import { extractAddedLines } from "../../../src/agent/skills/code-smell/detect";
 
 const simpleDiff = `diff --git a/src/index.ts b/src/index.ts
 --- a/src/index.ts

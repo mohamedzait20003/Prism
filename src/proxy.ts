@@ -3,10 +3,19 @@ import { NextResponse } from "next/server";
 
 export default withAuth(
   function proxy(req) {
+    const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
 
     if (!token) {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/auth/login", req.url));
+    }
+
+    if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/client/dashboard", req.url));
+    }
+
+    if (pathname.startsWith("/client") && token.role !== "CLIENT") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
 
     return NextResponse.next();
@@ -16,8 +25,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/reviews/:path*",
-    "/agents/:path*",
+    "/client/:path*",
+    "/admin/:path*",
   ],
 };

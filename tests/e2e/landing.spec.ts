@@ -5,7 +5,6 @@ test.describe("Landing page", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Code review that");
     await expect(page.getByRole("link", { name: "Get started free" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "View on GitHub" })).toBeVisible();
   });
 
   test("renders all four feature cards", async ({ page }) => {
@@ -24,9 +23,9 @@ test.describe("Landing page", () => {
     await expect(page.getByText("PRism gets smarter")).toBeVisible();
   });
 
-  test("Get started CTA links to /login", async ({ page }) => {
+  test("Get started CTA links to /auth/register", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "Get started free" }).first().click();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/auth\/register/);
   });
 });

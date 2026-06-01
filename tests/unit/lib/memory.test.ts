@@ -1,80 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
-vi.mock("fs/promises", () => ({
-  appendFile: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("simple-git", () => ({
-  default: vi.fn(() => ({
-    add: vi.fn().mockResolvedValue(undefined),
-    commit: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
-
-import { writeFeedback } from "@/lib/memory";
-import { appendFile } from "fs/promises";
-
-describe("writeFeedback", () => {
+describe("encrypt / decrypt round-trip", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.IS_DEVELOPMENT = "true";
-    process.env.AGENT_REPO_PATH = "/tmp/agent";
+    // 32 random bytes base64 — deterministic for tests
+    process.env.TOKEN_ENCRYPTION_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   });
 
-  it("appends a markdown block to feedback.md", async () => {
-    await writeFeedback({
-      prNum: 42,
-      repo: "org/repo",
-      file: "src/auth.ts",
-      line: 10,
-      ruleId: "eval-injection",
-      agentComment: "eval() called with user input",
-      humanEdit: "This is intentional",
-    });
-
-    expect(appendFile).toHaveBeenCalledOnce();
-    const [, content] = (appendFile as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(content).toContain("## PR #42");
-    expect(content).toContain("org/repo");
-    expect(content).toContain("eval-injection");
-    expect(content).toContain("This is intentional");
+  it("encrypts and decrypts a GitHub token", async () => {
+    const { encrypt, decrypt } = await import("@/lib/encrypt");
+    const original = "ghp_test_token_1234567890";
+    const ciphertext = encrypt(original);
+    expect(ciphertext).not.toBe(original);
+    expect(decrypt(ciphertext)).toBe(original);
   });
 
-  it("writes 'Dismissed' when humanEdit is null", async () => {
-    await writeFeedback({
-      prNum: 1,
-      repo: "a/b",
-      file: "x.ts",
-      line: 1,
-      ruleId: "console-log",
-      agentComment: "console.log in production",
-      humanEdit: null,
-    });
-
-    const [, content] = (appendFile as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(content).toContain("Dismissed");
+  it("produces different ciphertext for the same input (random IV)", async () => {
+    const { encrypt } = await import("@/lib/encrypt");
+    const a = encrypt("same-value");
+    const b = encrypt("same-value");
+    expect(a).not.toBe(b);
   });
 
-  it("commits the change to git", async () => {
-    const simpleGit = await import("simple-git");
-    const mockGit = {
-      add: vi.fn().mockResolvedValue(undefined),
-      commit: vi.fn().mockResolvedValue(undefined),
-    };
-    (simpleGit.default as ReturnType<typeof vi.fn>).mockReturnValue(mockGit);
-
-    await writeFeedback({
-      prNum: 5,
-      repo: "org/repo",
-      file: "api.ts",
-      line: 3,
-      ruleId: "sql-injection",
-      agentComment: "Raw SQL concat",
-      humanEdit: null,
-    });
-
-    expect(mockGit.commit).toHaveBeenCalledWith(
-      expect.stringContaining("PR #5")
-    );
+  it("throws on tampered ciphertext", async () => {
+    const { encrypt, decrypt } = await import("@/lib/encrypt");
+    const ciphertext = encrypt("sensitive");
+    const tampered = ciphertext.slice(0, -4) + "XXXX";
+    expect(() => decrypt(tampered)).toThrow();
   });
 });

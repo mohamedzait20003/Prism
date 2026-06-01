@@ -1,0 +1,19 @@
+<svg width="100%" viewBox="0 0 680 280" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>PRism</title>
+
+  <!-- prism triangle -->
+  <polygon points="120,60 220,220 20,220" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="round"/>
+
+  <!-- spectrum bar at base -->
+  <line x1="20"  y1="232" x2="48"  y2="232" stroke="#e85555" stroke-width="6" stroke-linecap="round"/>
+  <line x1="52"  y1="232" x2="80"  y2="232" stroke="#e8873a" stroke-width="6" stroke-linecap="round"/>
+  <line x1="84"  y1="232" x2="112" y2="232" stroke="#d4b800" stroke-width="6" stroke-linecap="round"/>
+  <line x1="116" y1="232" x2="144" y2="232" stroke="#3ab876" stroke-width="6" stroke-linecap="round"/>
+  <line x1="148" y1="232" x2="176" y2="232" stroke="#3a7fd4" stroke-width="6" stroke-linecap="round"/>
+  <line x1="180" y1="232" x2="208" y2="232" stroke="#7a5fd4" stroke-width="6" stroke-linecap="round"/>
+  <line x1="212" y1="232" x2="220" y2="232" stroke="#c44fd4" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- wordmark -->
+  <text x="260" y="178" font-family="system-ui,-apple-system,sans-serif" font-size="96" font-weight="700" fill="#ffffff" letter-spacing="-2">PR</text>
+  <text x="418" y="178" font-family="system-ui,-apple-system,sans-serif" font-size="96" font-weight="300" fill="#ffffff" letter-spacing="-2">ism</text>
+</svg>

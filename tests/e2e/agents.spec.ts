@@ -1,66 +1,78 @@
 import { test, expect } from "@playwright/test";
 
-const mockAgent = {
+const mockConfig = {
   soul: "# Identity\n\nYou are a senior software engineer.",
   rules: "# Rules\n\n## Must always flag\n\n- eval()",
-  commits: [
-    { hash: "abc1234", message: "init: agent definition", date: new Date().toISOString() },
-  ],
+  commits: [],
 };
 
-test.describe("Agent editor", () => {
+const mockProposals = [
+  {
+    id: "p1",
+    proposedSoul: null,
+    proposedRules: "# Rules\n\n## Updated rules\n\n- eval()\n- console.log",
+    reasoning: "console-log was rejected 4 times",
+    createdAt: new Date().toISOString(),
+  },
+];
+
+test.describe("Admin Agents page", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route("**/api/agents/reviewer", (route) =>
+    await page.route("**/api/admin/agents/reviewer", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(mockAgent),
+        body: JSON.stringify(mockConfig),
       })
     );
 
-    await page.route("**/api/agents/reviewer/save", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' })
+    await page.route("**/api/admin/agents/reviewer/proposals", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockProposals),
+      })
+    );
+
+    await page.route("**/api/auth/session", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: { id: "a1", email: "admin@test.com", role: "ADMIN", name: "Admin" },
+        }),
+      })
     );
   });
 
-  test("renders SOUL.md and RULES.md textareas", async ({ page }) => {
-    await page.goto("/agents/reviewer");
-    await expect(page.getByLabel("SOUL.md")).toBeVisible();
-    await expect(page.getByLabel("RULES.md")).toBeVisible();
+  test("renders page heading", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByRole("heading", { name: "Agent Rules" })).toBeVisible();
   });
 
-  test("textareas are pre-filled with current content", async ({ page }) => {
-    await page.goto("/agents/reviewer");
-    const soul = page.getByLabel("SOUL.md");
-    await expect(soul).toHaveValue(/senior software engineer/);
-    const rules = page.getByLabel("RULES.md");
-    await expect(rules).toHaveValue(/Must always flag/);
+  test("shows current RULES section", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByText("RULES")).toBeVisible();
   });
 
-  test("Save button posts to /api/agents/reviewer/save", async ({ page }) => {
-    let savedBody: unknown;
-    await page.route("**/api/agents/reviewer/save", async (route) => {
-      savedBody = await route.request().postDataJSON();
-      await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
-    });
-
-    await page.goto("/agents/reviewer");
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Saved.")).toBeVisible();
-    expect(savedBody).toMatchObject({ soul: mockAgent.soul, rules: mockAgent.rules });
+  test("shows current SOUL section", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByText("SOUL")).toBeVisible();
   });
 
-  test("shows agent git history commits", async ({ page }) => {
-    await page.goto("/agents/reviewer");
-    await expect(page.getByText("abc1234")).toBeVisible();
-    await expect(page.getByText("init: agent definition")).toBeVisible();
+  test("shows Proposed Changes panel", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByText("Proposed Changes")).toBeVisible();
   });
 
-  test("404 for unknown agent id", async ({ page }) => {
-    await page.route("**/api/agents/unknown", (route) =>
-      route.fulfill({ status: 404, body: '{"error":"Not found"}' })
-    );
-    await page.goto("/agents/unknown");
-    await expect(page.getByText("404", { exact: false })).toBeVisible();
+  test("shows proposal with reasoning", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByText("console-log was rejected 4 times")).toBeVisible();
+  });
+
+  test("shows Approve and Reject buttons on proposal", async ({ page }) => {
+    await page.goto("/admin/agents");
+    await expect(page.getByRole("button", { name: /Approve/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Reject/ })).toBeVisible();
   });
 });

@@ -1,7 +1,7 @@
 import { createClient } from "redis";
 import { createNodeRedisClient } from "bullmq";
 
-const useTls = !!process.env.REDIS_HOST;
+const useTls = process.env.REDIS_TLS === "true";
 
 export const redis = createClient({
   username: process.env.REDIS_USERNAME ?? "default",

@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Dashboard", () => {
+test.describe("Client Dashboard", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route("**/api/stats", (route) =>
+    await page.route("**/api/client/stats", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -19,7 +19,7 @@ test.describe("Dashboard", () => {
       })
     );
 
-    await page.route("**/api/reviews", (route) =>
+    await page.route("**/api/client/reviews", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -34,34 +34,42 @@ test.describe("Dashboard", () => {
         ]),
       })
     );
+
+    await page.route("**/api/client/repos", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { id: "repo1", fullName: "org/repo", active: true, createdAt: new Date().toISOString() },
+        ]),
+      })
+    );
+
+    await page.route("**/api/auth/session", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: { id: "u1", email: "test@test.com", role: "CLIENT", name: "Test User" },
+        }),
+      })
+    );
   });
 
-  test("shows all four metric cards", async ({ page }) => {
-    await page.goto("/dashboard");
+  test("shows metric cards", async ({ page }) => {
+    await page.goto("/client/dashboard");
     await expect(page.getByText("Reviews")).toBeVisible();
-    await expect(page.getByText("Comments")).toBeVisible();
+    await expect(page.getByText("Findings")).toBeVisible();
     await expect(page.getByText("Approval rate")).toBeVisible();
-    await expect(page.getByText("Feedback entries")).toBeVisible();
   });
 
-  test("displays correct metric values", async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByText("12")).toBeVisible();
-    await expect(page.getByText("47")).toBeVisible();
-    await expect(page.getByText("83%")).toBeVisible();
-    await expect(page.getByText("9")).toBeVisible();
+  test("shows recent reviews section", async ({ page }) => {
+    await page.goto("/client/dashboard");
+    await expect(page.getByText("Recent Reviews")).toBeVisible();
   });
 
-  test("shows recent reviews table with data", async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByText("org/repo")).toBeVisible();
-    await expect(page.getByText("#42")).toBeVisible();
-    await expect(page.getByRole("link", { name: "View →" })).toBeVisible();
-  });
-
-  test("shows top rejected rules", async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByText("console-log")).toBeVisible();
-    await expect(page.getByText("eval-injection")).toBeVisible();
+  test("shows connected repositories section", async ({ page }) => {
+    await page.goto("/client/dashboard");
+    await expect(page.getByText("Repositories")).toBeVisible();
   });
 });

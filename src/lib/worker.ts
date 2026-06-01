@@ -10,6 +10,7 @@ import { db } from "./db";
 import { runReview } from "./gitagent";
 import type { ReviewJobPayload } from "./queue";
 import { connection } from "../config/redis.config";
+import { getAgentConfigCached } from "./agent-config";
 import { fetchDiff, postReview, parseRepo } from "./github";
 
 const AGENT_REPO_PATH = resolve(process.env.AGENT_REPO_PATH ?? "./agent");
@@ -24,25 +25,29 @@ function getAgentVersion(): string {
   }
 }
 
-const worker = new Worker<ReviewJobPayload>(
-  "review-pr",
-  async (job) => {
-    const { repo, prNum, sha, diffUrl } = job.data;
-    const { owner, repo: repoName } = parseRepo(repo);
+const worker = new Worker<ReviewJobPayload>("review-pr", async (job) => {
+    const { repoFullName, repoId, prNum, sha, diffUrl, githubToken } = job.data;
+    
+    if (!githubToken) 
+      throw new Error(`No GitHub token for repo ${repoFullName}`);
+    
+    const { owner, repo: repoName } = parseRepo(repoFullName);
     const agentVer = getAgentVersion();
 
-    const diff = await fetchDiff(diffUrl);
-    const findings = await runReview(AGENT_REPO_PATH, diff);
+    const agentConfig = await getAgentConfigCached(); // TTL-cached — max 1 DB hit per 5 min
 
-    await postReview(owner, repoName, prNum, sha, findings);
+    const diff = await fetchDiff(diffUrl, githubToken);
+    const findings = await runReview(AGENT_REPO_PATH, diff, agentConfig);
+
+    await postReview(owner, repoName, prNum, sha, findings, githubToken);
 
     await db.$transaction(async (tx) => {
       await tx.review.create({
         data: {
           prNum,
-          repo,
           sha,
           agentVer,
+          repoId,
           comments: {
             create: findings.map((f) => ({
               file: f.file,
@@ -60,7 +65,7 @@ const worker = new Worker<ReviewJobPayload>(
 );
 
 worker.on("completed", (job) => {
-  console.log(`[worker] job ${job.id} completed — PR #${job.data.prNum} (${job.data.repo})`);
+  console.log(`[worker] job ${job.id} completed — PR #${job.data.prNum} (${job.data.repoFullName})`);
 });
 
 worker.on("failed", (job, err) => {
